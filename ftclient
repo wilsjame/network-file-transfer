@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+
+#*********************************************************************
+#** Author: James G Wilson
+#** Date: 5/29/2018
+#** Description: ftclient
+#**		 A simple file transfer client written in Python. To
+#		 be used with the C program, ftclient.c.
+#*********************************************************************
+
