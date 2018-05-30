@@ -13,14 +13,16 @@
 #include <string.h>
 #include <unistd.h>
 
-/* minimum functions */
-//handle request functions
 void printUsage();
+int handleRequest(int sockfd, int* data_port);
+void receivePayload(int sockfd, char* buffer, size_t size);
 int startup(char* server_port);
 
 int main(int argc, char* argv[])
 {
 	int server_sockfd;
+	int controlConnection_sockfd;
+	pid_t spawnPid;
 	
 	// Check for incorrect command line usage.
 	if(argc != 2)
@@ -30,18 +32,84 @@ int main(int argc, char* argv[])
 	}
 
 	server_sockfd = startup(argv[1]);
+	printf("Server open on %s\n", argv[1]);
 	
 	// Begin queuing connection requests until limit is reached.
 	// It can receive up to 5 connections.
 	listen(server_sockfd, 5); 
 
+	// Loop to accept clients indefinitely.
+	while(1)
+	{
+
+		// Accept a connection, blocking until one is available.
+		// accept() generates a new socket to be used for the actual connection.
+		printf("trace1\n");
+		controlConnection_sockfd = accept(server_sockfd, NULL, NULL);
+		if(controlConnection_sockfd < 0) perror("ERROR on accept!\n"); 
+
+		// Fork off child to complete the transaction with the client using
+		// the newly generated socket from accept().
+		spawnPid = fork();
+
+		switch(spawnPid)
+		{
+			case -1:
+				perror("fork() failure!\n"); exit(1);
+			
+			case 0: 	// In child. 
+				printf("Contact made! In child process!\n");
+
+				int command;
+				int data_port;
+				int dataConnection_sockfd;
+
+				handleRequest(controlConnection_sockfd, &data_port);
+
+				break;
+				
+		}
+
+	}
+
 	return 0;
+
 }
 
 // Print command line argument format.
 void printUsage()
 { 
 	printf("Usage ./chatclient <SERVER_PORT>\n");
+}
+
+// Handles the request from the client.
+int handleRequest(int sockfd, int* data_port)
+{
+	char buffer[100]; memset(buffer, '\0', sizeof(buffer));
+	char client_command[3]; memset(client_command, '\0', sizeof(client_command));
+
+	// Receive entire message from client
+	receivePayload(sockfd, buffer, sizeof(buffer));
+
+	// *****************LEFT OFF HERE*********************
+	printf("Request received from client: %s\n", buffer);
+
+}
+
+// Read client's message, up to size bytes, from the socket.
+void receivePayload(int sockfd, char* buffer, size_t size)
+{
+	char tempBuffer[1]; memset(buffer, '\0', sizeof(tempBuffer));
+	int bytes_read;
+
+	do
+	{
+		bytes_read = recv(sockfd, tempBuffer, sizeof(tempBuffer), 0); 
+		strcat(buffer, tempBuffer);
+
+	}while(bytes_read > 0);
+
+	buffer[strlen(buffer)-1] = '\0';
 }
 
 // Does all the dirty work to start up the server on the given port.
@@ -112,3 +180,4 @@ int startup(char* server_port)
 	return sockfd;
 	
 }
+
