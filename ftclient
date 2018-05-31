@@ -9,6 +9,7 @@
 #*********************************************************************
 import sys
 import socket
+import struct
 
 # minimum functions
 # initiateContact
@@ -16,11 +17,27 @@ import socket
 # receive file functions
 
 # Initiate contact with the server.
+# Returns a connected socket.
 def initiateContact(server_host, server_port):
 	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	s.connect((server_host, int(server_port)))
 
 	return s
+
+# Sends a message to the server.
+def sendMessage(socket, message):
+	message = bytes(message, encoding="UTF-8")
+	socket.sendall(message)
+
+# Sends a number to the server.
+def sendNumber(socket, number):
+	number = struct.pack('i', int(number))
+	socket.send(number)
+
+# Send a command to the server
+def makeRequest(server_socket, command, data_port):
+	sendMessage(server_socket, command + "\0")
+	sendNumber(server_socket, data_port)
 
 def main():
 
@@ -40,19 +57,17 @@ def main():
 		data_port = sys.argv[4]
 	elif len(sys.argv) is 6: 
 		filename = sys.argv[4]
-		data_port = int(sys.argv[5])
+		data_port = sys.argv[5]
 
 	if command not in ["-g", "-l"]:
 		print("Invalid command. Valid commands are: -g or -l.")
 		exit(1)
 	
-	# Establish control connection with server
+	# Establish control connection with server.
 	server_socket = initiateContact(server_host, server_port)
 
-	#********LEFT OFF HERE************
-	message = "Hello! from client :D"
-	server_socket.send(message.encode())
-
+	# Send command and data port to server.
+	makeRequest(server_socket, command, data_port)
 
 if __name__ == "__main__":
 
