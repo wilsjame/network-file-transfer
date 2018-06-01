@@ -54,6 +54,17 @@ def receiveDirectory(server_data_socket):
 	for file_name in received:
 		print(file_name)
 
+# Receives a message from the server (most likely file name or error message).
+def receiveMessage(sockfd):
+
+	# Receive the length of the upcoming payload.
+	message_size = sockfd.recv(4)
+	message_size = struct.unpack("I", message_size)
+
+	# Parse and print the delivered content.
+	payload = sockfd.recv(message_size[0]).decode()
+	print(payload)
+
 def main():
 
 	# Check for correct command line syntax.
@@ -85,20 +96,42 @@ def main():
 	makeRequest(server_control_socket, command, data_port)
 
 	# Depending on the command set take the appropriate action.
-	if command in "-l":
+	if command in "-l": # Server's directory contents requested.
 
 		# Pause for a second.
 		sleep(1)
 
 		# Establish data connection with server.
 		server_data_socket = initiateContact(server_host, data_port)
-		print("Receiving directory structure from" + server_host + ":" + data_port)
+		print("Receiving directory structure from " + server_host + ":" + data_port)
 
 		# Get the directory contents payload from the server.
 		receiveDirectory(server_data_socket)
 
 		# Don't leave open sockets!
 		server_data_socket.close()
+
+	elif command in "-g": # File requested.
+
+		# Paude for a second.
+		sleep(1)
+
+		# Get the length of the file name requested.
+		filename_length = len(filename)
+		print("length of filename: " + filename + ": " + str(filename_length))
+
+		# Establish data connection with server.
+		server_data_socket = initiateContact(server_host, data_port)
+		print("Requesting file: " + filename + " from " + server_host + ":" + data_port)
+
+		# Send length of the filename first.
+		sendNumber(server_data_socket, filename_length)
+
+		# Now send the filename over.
+		sendMessage(server_data_socket, filename)
+
+		# Receive the response
+		receiveMessage(server_data_socket)
 
 if __name__ == "__main__":
 

@@ -75,7 +75,7 @@ int main(int argc, char* argv[])
 				command = handleRequest(controlConnection_sockfd, &data_port);
 
 				// Check what command the client sent and act accordingly.
-				if(command == 1)
+				if(command == 1) // Directory contents requested.
 				{
 					
 					// "-l" get the directory contents.
@@ -85,7 +85,7 @@ int main(int argc, char* argv[])
 					int total_length = 0;
 					int i = 0;
 
-					
+					// Set up data connection socket.
 					// Convert data_port from int to a string.
 					char data_port_str[50]; memset(data_port_str, '\0', sizeof(data_port_str));
 					sprintf(data_port_str, "%d", data_port);
@@ -120,9 +120,70 @@ int main(int argc, char* argv[])
 					exit(0);
 					
 				}
-				else if(command == 2)
+				else if(command == 2) // File requested.
 				{
-					printf("File requested.\n");
+					int file_name_length;
+					char file_name[256]; memset(file_name, '\0', sizeof(file_name));
+
+					// Set up data connection socket.
+					// Convert data_port from int to a string.
+					char data_port_str[50]; memset(data_port_str, '\0', sizeof(data_port_str));
+					sprintf(data_port_str, "%d", data_port);
+
+					// Create server for the data connection.
+					data_server_sockfd = startup(data_port_str);
+
+					// Block until accepts gets a client request.
+					listen(data_server_sockfd, 1); 
+					dataConnection_sockfd = accept(data_server_sockfd, NULL, NULL);
+					if(dataConnection_sockfd < 0) perror("ERROR on data connection accept!\n"); 
+
+					// Receive the length of the filename the client is requesting.
+					file_name_length = receiveNumber(dataConnection_sockfd);
+
+					// Receive the filename now.
+					receiveMessage(dataConnection_sockfd, file_name, file_name_length);
+					// Debug
+					printf("Length of filename requested: %d.\n", file_name_length);
+					printf("Filename requested: %s.\n", file_name);
+
+					// Now check if the file exists in the current directory.
+					char* contents[256] = {NULL};
+					int total_length = 0;
+					int i = 0;
+					int match_found = 0;
+					total_length = getDirectory(contents);
+
+					while(contents[i] != NULL)
+					{
+						printf("Comparing file #%d: %s with %s\n", i, contents[i], file_name);
+						if(strcmp(file_name, contents[i]) == 0)
+						{
+							printf("MATCH FOUND\n");
+							match_found = 1;
+						}
+						
+						i++;
+					}
+
+					// Take action depending on whether a match was found or not.
+					if(match_found == 1)
+					{
+						// Send the file _/ \_ 
+					}
+					else
+					{
+						sendNumber(dataConnection_sockfd, (int)strlen("File not found!"));
+						sendMessage(dataConnection_sockfd, "File not found!");
+					}
+
+					// Don't leave open sockets! 
+					close(data_server_sockfd);
+					close(dataConnection_sockfd);
+
+					// Exit the child process.
+					exit(0);
+
 				}
 				else if(command == 0)
 				{
