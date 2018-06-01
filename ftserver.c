@@ -20,10 +20,13 @@ int handleRequest(int sockfd, int* data_port);
 void receiveMessage(int sockfd, char* buffer, size_t size);
 int receiveNumber(int sockfd);
 int startup(char* server_port);
+void sendNumber(int sockfd, int number);
+void sendMessage(int sockfd, char* buffer);
+
 
 int main(int argc, char* argv[])
 {
-	int server_sockfd;
+	int connection_server_sockfd;
 	int controlConnection_sockfd;
 	pid_t spawnPid;
 	
@@ -34,12 +37,12 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 
-	server_sockfd = startup(argv[1]);
+	connection_server_sockfd = startup(argv[1]);
 	printf("Server open on %s\n", argv[1]);
 	
 	// Begin queuing connection requests until limit is reached.
 	// It can receive up to 5 connections.
-	listen(server_sockfd, 5); 
+	listen(connection_server_sockfd, 5); 
 
 	// Loop to accept clients indefinitely.
 	while(1)
@@ -47,8 +50,8 @@ int main(int argc, char* argv[])
 
 		// Accept a connection, blocking until one is available.
 		// accept() generates a new socket to be used for the actual connection.
-		controlConnection_sockfd = accept(server_sockfd, NULL, NULL);
-		if(controlConnection_sockfd < 0) perror("ERROR on accept!\n"); 
+		controlConnection_sockfd = accept(connection_server_sockfd, NULL, NULL);
+		if(controlConnection_sockfd < 0) perror("ERROR on control connection accept!\n"); 
 
 		// Fork off child to complete the transaction with the client using
 		// the newly generated socket from accept().
@@ -59,20 +62,63 @@ int main(int argc, char* argv[])
 			case -1:
 				perror("fork() failure!\n"); exit(1);
 			
-			case 0: 	// In child. 
-				printf("Connection made with client! In child process!\n");
+			case 0: ; 	// In child. 
 
-				//int dataConnection_sockfd;
-
-				// Accept and interpret command from client.
 				int data_port;
 				int command;
+				int data_server_sockfd;
+				int dataConnection_sockfd;
+
+				printf("Connection made with client! In child process!\n");
+
+				// Accept and interpret command from client.
 				command = handleRequest(controlConnection_sockfd, &data_port);
 
 				// Check what command the client sent and act accordingly.
 				if(command == 1)
 				{
+					
+					// "-l" get the directory contents.
 					printf("List directory requested on port %d\n", data_port);
+
+					char* contents[256] = {NULL};
+					int total_length = 0;
+					int i = 0;
+
+					
+					// Convert data_port from int to a string.
+					char data_port_str[50]; memset(data_port_str, '\0', sizeof(data_port_str));
+					sprintf(data_port_str, "%d", data_port);
+
+					// Create server for the data connection.
+					data_server_sockfd = startup(data_port_str);
+
+					// Block until accepts gets a client request.
+					listen(data_server_sockfd, 1); 
+					dataConnection_sockfd = accept(data_server_sockfd, NULL, NULL);
+					if(dataConnection_sockfd < 0) perror("ERROR on data connection accept!\n"); 
+
+					// Send directory to client by first sending the length
+					// and then the actual contents.
+					printf("Sending directory contents to client on port: %d\n", data_port);
+					total_length = getDirectory(contents);
+					printf("sending file name: %s\n", contents[i]);
+
+					sendNumber(dataConnection_sockfd, total_length);
+					while(contents[i] != NULL)
+					{
+						printf("sending file name: %s\n", contents[i]);
+						sendMessage(dataConnection_sockfd, contents[i]);
+						i++;
+					}
+
+					// Don't leave open sockets! 
+					close(data_server_sockfd);
+					close(dataConnection_sockfd);
+
+					// Exit the child process.
+					exit(0);
+					
 				}
 				else if(command == 2)
 				{
@@ -101,8 +147,48 @@ void printUsage()
 	printf("Usage ./chatclient <SERVER_PORT>\n");
 }
 
+// Sends a string (message) to the client.
+void sendMessage(int sockfd, char* buffer)
+{
+	ssize_t n;
+	size_t message_length = strlen(buffer) + 1;
+	size_t running_total = 0;
+
+	// Send the entire message.
+	while(running_total < message_length)
+	{
+		n = write(sockfd, buffer, message_length - running_total);
+		running_total += n;
+		//printf("bytes sent: %d\n", running_total);
+
+		if(n < 0)
+		{
+			perror("ERROR sending message\n");
+		}
+		else if(n == 0)
+		{
+			running_total = message_length - running_total;
+		}
+
+	}
+
+}
+
+// Sends an integer value to the client. Primarly used to send the length of 
+// the upcoming message.
+void sendNumber(int sockfd, int number)
+{
+	ssize_t n = 0;
+
+	n = write(sockfd, &number, sizeof(int));
+
+	if(n < 0) perror("ERROR receiving number\n");
+
+}
+
 // Gets the contents of a directory and stores them in the parameter passed.
 // Returns the length in bytes of the sum of the regular file names.
+
 int getDirectory(char* contents[])
 {
 	DIR *dirp;
@@ -128,6 +214,7 @@ int getDirectory(char* contents[])
 				// Store the name of the files in the array of strings
 				// and add its byte length to the total length.
 				contents[i] = entry->d_name;
+
 				total_length += strlen(contents[i]);
 				i++;
 			}
@@ -155,14 +242,12 @@ int handleRequest(int sockfd, int* data_port)
 
 	if(strcmp(command, "-l") == 0)
 	{
-		printf("trace -l\n");
 
 		return 1;
 
 	}
 	else if(strcmp(command, "-g") == 0)
 	{
-		printf("trace -g\n");
 
 		return 2;
 
@@ -205,7 +290,7 @@ int receiveNumber(int sockfd)
 
 	n = read(sockfd, &number, sizeof(int));
 
-	if( n < 0) perror("ERROR receiving number\n");
+	if(n < 0) perror("ERROR receiving number\n");
 
 	return number;
 

@@ -10,6 +10,8 @@
 import sys
 import socket
 import struct
+from time import sleep
+import binascii
 
 # minimum functions
 # initiateContact
@@ -34,10 +36,23 @@ def sendNumber(socket, number):
 	number = struct.pack('i', int(number))
 	socket.send(number)
 
-# Send a command to the server
-def makeRequest(server_socket, command, data_port):
-	sendMessage(server_socket, command + "\0")
-	sendNumber(server_socket, data_port)
+# Send a command to the server.
+def makeRequest(server_control_socket, command, data_port):
+	sendMessage(server_control_socket, command + "\0")
+	sendNumber(server_control_socket, data_port)
+
+# Receives the directory contents payload from the server.
+def receiveDirectory(server_data_socket):
+
+	# Receive the length of the upcoming content
+	directory_size = server_data_socket.recv(4)
+	directory_size = struct.unpack("I", directory_size)
+
+	# Parse and print the delivered content.
+	received = str(server_data_socket.recv(directory_size[0]), encoding = "UTF-8").split("\x00")
+
+	for file_name in received:
+		print(file_name)
 
 def main():
 
@@ -64,10 +79,26 @@ def main():
 		exit(1)
 	
 	# Establish control connection with server.
-	server_socket = initiateContact(server_host, server_port)
+	server_control_socket = initiateContact(server_host, server_port)
 
 	# Send command and data port to server.
-	makeRequest(server_socket, command, data_port)
+	makeRequest(server_control_socket, command, data_port)
+
+	# Depending on the command set take the appropriate action.
+	if command in "-l":
+
+		# Pause for a second.
+		sleep(1)
+
+		# Establish data connection with server.
+		server_data_socket = initiateContact(server_host, data_port)
+		print("Receiving directory structure from" + server_host + ":" + data_port)
+
+		# Get the directory contents payload from the server.
+		receiveDirectory(server_data_socket)
+
+		# Don't leave open sockets!
+		server_data_socket.close()
 
 if __name__ == "__main__":
 
