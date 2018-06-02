@@ -11,7 +11,7 @@ import sys
 import socket
 import struct
 from time import sleep
-import binascii
+from os import path
 
 # minimum functions
 # initiateContact
@@ -63,7 +63,18 @@ def receiveMessage(sockfd):
 
 	# Parse and print the delivered content.
 	payload = sockfd.recv(message_size[0]).decode()
-	print(payload)
+	#print(payload)
+
+	return payload
+
+# Receive file from server.
+def receiveFile(sockfd, filename):
+	file_contents = receiveMessage(sockfd)
+
+	if path.isfile(filename):
+		filename = filename.split(".")[0] + "_copy.txt"
+	with open(filename, 'w') as f:
+		f.write(file_contents)
 
 def main():
 
@@ -113,7 +124,7 @@ def main():
 
 	elif command in "-g": # File requested.
 
-		# Paude for a second.
+		# Pause for a second.
 		sleep(1)
 
 		# Get the length of the file name requested.
@@ -121,17 +132,40 @@ def main():
 		print("length of filename: " + filename + ": " + str(filename_length))
 
 		# Establish data connection with server.
-		server_data_socket = initiateContact(server_host, data_port)
+		#server_data_socket = initiateContact(server_host, data_port)
 		print("Requesting file: " + filename + " from " + server_host + ":" + data_port)
 
 		# Send length of the filename first.
-		sendNumber(server_data_socket, filename_length)
+		sendNumber(server_control_socket, filename_length)
 
 		# Now send the filename over.
-		sendMessage(server_data_socket, filename)
+		sendMessage(server_control_socket, filename)
 
 		# Receive the response
-		receiveMessage(server_data_socket)
+		response = receiveMessage(server_control_socket)
+
+		if response in "File not found!":
+			print(response)
+		elif response in "File found!":
+			print(response)
+
+			# Pause for a second.
+			sleep(1)
+
+			# Establish data connection with server.
+			server_data_socket = initiateContact(server_host, data_port)
+			print("Receiving file: " + filename + " from " + server_host + ":" + data_port)
+
+			#TODO
+			# Receive the requested file.
+			receiveFile(server_data_socket, filename)
+			print("File transfer complete!")
+
+			# Don't leave open sockets!
+			server_data_socket.close()
+	
+	# Don't leave open sockets.
+	server_control_socket.close()
 
 if __name__ == "__main__":
 

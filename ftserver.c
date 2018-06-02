@@ -22,6 +22,9 @@ int receiveNumber(int sockfd);
 int startup(char* server_port);
 void sendNumber(int sockfd, int number);
 void sendMessage(int sockfd, char* buffer);
+char* getFile(char* file_name);
+void sendFile(int sockfd, char* file_name);
+
 
 
 int main(int argc, char* argv[])
@@ -102,12 +105,12 @@ int main(int argc, char* argv[])
 					// and then the actual contents.
 					printf("Sending directory contents to client on port: %d\n", data_port);
 					total_length = getDirectory(contents);
-					printf("sending file name: %s\n", contents[i]);
+					//printf("sending file name: %s\n", contents[i]);
 
 					sendNumber(dataConnection_sockfd, total_length);
 					while(contents[i] != NULL)
 					{
-						printf("sending file name: %s\n", contents[i]);
+						//printf("sending file name: %s\n", contents[i]);
 						sendMessage(dataConnection_sockfd, contents[i]);
 						i++;
 					}
@@ -125,6 +128,7 @@ int main(int argc, char* argv[])
 					int file_name_length;
 					char file_name[256]; memset(file_name, '\0', sizeof(file_name));
 
+					/*
 					// Set up data connection socket.
 					// Convert data_port from int to a string.
 					char data_port_str[50]; memset(data_port_str, '\0', sizeof(data_port_str));
@@ -137,12 +141,13 @@ int main(int argc, char* argv[])
 					listen(data_server_sockfd, 1); 
 					dataConnection_sockfd = accept(data_server_sockfd, NULL, NULL);
 					if(dataConnection_sockfd < 0) perror("ERROR on data connection accept!\n"); 
+					*/
 
 					// Receive the length of the filename the client is requesting.
-					file_name_length = receiveNumber(dataConnection_sockfd);
+					file_name_length = receiveNumber(controlConnection_sockfd);
 
 					// Receive the filename now.
-					receiveMessage(dataConnection_sockfd, file_name, file_name_length);
+					receiveMessage(controlConnection_sockfd, file_name, file_name_length);
 					// Debug
 					printf("Length of filename requested: %d.\n", file_name_length);
 					printf("Filename requested: %s.\n", file_name);
@@ -169,17 +174,36 @@ int main(int argc, char* argv[])
 					// Take action depending on whether a match was found or not.
 					if(match_found == 1)
 					{
-						// Send the file _/ \_ 
+						sendNumber(controlConnection_sockfd, (int)strlen("File found!"));
+						sendMessage(controlConnection_sockfd, "File found!");
+
+						// Set up data connection socket.
+						// Convert data_port from int to a string.
+						char data_port_str[50]; memset(data_port_str, '\0', sizeof(data_port_str));
+						sprintf(data_port_str, "%d", data_port);
+
+						// Create server for the data connection.
+						data_server_sockfd = startup(data_port_str);
+
+						// Block until accepts gets a client request.
+						listen(data_server_sockfd, 1); 
+						dataConnection_sockfd = accept(data_server_sockfd, NULL, NULL);
+						if(dataConnection_sockfd < 0) perror("ERROR on data connection accept!\n"); 
+
+						// Send the found requested file contents.
+						// TODO
+						sendFile(dataConnection_sockfd, file_name);
+
+						// Don't leave open sockets! 
+						close(data_server_sockfd);
+						close(dataConnection_sockfd);
+
 					}
 					else
 					{
-						sendNumber(dataConnection_sockfd, (int)strlen("File not found!"));
-						sendMessage(dataConnection_sockfd, "File not found!");
+						sendNumber(controlConnection_sockfd, (int)strlen("File not found!"));
+						sendMessage(controlConnection_sockfd, "File not found!");
 					}
-
-					// Don't leave open sockets! 
-					close(data_server_sockfd);
-					close(dataConnection_sockfd);
 
 					// Exit the child process.
 					exit(0);
@@ -190,9 +214,8 @@ int main(int argc, char* argv[])
 					perror("ERROR invalid command!");
 				}
 				
-
-				
-				break;
+				//break;
+				exit(0); 
 				
 		}
 
@@ -289,6 +312,73 @@ int getDirectory(char* contents[])
 
 	return number_of_files + total_length;
 		
+}
+
+// Sends the contents of a requested file in the current directory to the client.
+void sendFile(int sockfd, char* file_name)
+{
+	char* file_contents;
+	file_contents = getFile(file_name);
+
+	sendNumber(sockfd, strlen(file_contents));
+	sendMessage(sockfd, file_contents);
+
+}
+
+// Gets the contents of the requested file and stores them in a string.
+char* getFile(char* file_name)
+{
+	char* file_contents = NULL;
+
+	FILE* fp = fopen(file_name, "r");
+
+	if(fp == NULL) 
+	{
+		perror("ERROR opening file");
+	}
+	else // The file opened succesfully.
+	{
+
+		// Start reading the file.
+		if(fseek(fp, 0L, SEEK_END) == 0)
+		{
+
+			// Obtain the current value of the file pointer (position).
+			long buffer_size = ftell(fp);
+
+			if(buffer_size == -1) // Error checking.
+			{
+				perror("ERROR invalid file pointer\n");
+			}
+
+			file_contents = malloc(sizeof(char) * (buffer_size + 1));
+
+			if(fseek(fp, 0L, SEEK_SET) != 0) // Error checking.
+			{
+				perror("ERROR not reading from beginning of file\n.");
+			}
+
+			// Okay, now begin reading the file.
+			size_t new_length = fread(file_contents, sizeof(char), buffer_size, fp);
+
+			if(ferror(fp) != 0)
+			{
+				perror("ERROR while reading file!\n");
+			}
+			else
+			{
+				file_contents[new_length++] = '\0';
+			}
+
+		}
+
+	}
+
+	// Don't leave poen file streams.
+	fclose(fp);
+
+	return file_contents;
+
 }
 
 // Handles the request from the client by parsing the message.
