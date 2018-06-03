@@ -25,15 +25,13 @@ void sendMessage(int sockfd, char* buffer);
 char* getFile(char* file_name);
 void sendFile(int sockfd, char* file_name);
 
-
-
 int main(int argc, char* argv[])
 {
 	int connection_server_sockfd;
 	int controlConnection_sockfd;
 	pid_t spawnPid;
 	
-	// Check for incorrect command line usage.
+	// Validate parameters
 	if(argc != 2)
 	{
 		printUsage();
@@ -127,44 +125,35 @@ int main(int argc, char* argv[])
 				{
 					int file_name_length;
 					char file_name[256]; memset(file_name, '\0', sizeof(file_name));
-
-					/*
-					// Set up data connection socket.
-					// Convert data_port from int to a string.
-					char data_port_str[50]; memset(data_port_str, '\0', sizeof(data_port_str));
-					sprintf(data_port_str, "%d", data_port);
-
-					// Create server for the data connection.
-					data_server_sockfd = startup(data_port_str);
-
-					// Block until accepts gets a client request.
-					listen(data_server_sockfd, 1); 
-					dataConnection_sockfd = accept(data_server_sockfd, NULL, NULL);
-					if(dataConnection_sockfd < 0) perror("ERROR on data connection accept!\n"); 
-					*/
-
+					
 					// Receive the length of the filename the client is requesting.
 					file_name_length = receiveNumber(controlConnection_sockfd);
 
 					// Receive the filename now.
 					receiveMessage(controlConnection_sockfd, file_name, file_name_length);
+
 					// Debug
-					printf("Length of filename requested: %d.\n", file_name_length);
-					printf("Filename requested: %s.\n", file_name);
+					//printf("Length of filename requested: %d.\n", file_name_length);
+					//printf("Filename requested: %s.\n", file_name);
 
 					// Now check if the file exists in the current directory.
 					char* contents[256] = {NULL};
-					int total_length = 0;
+					//int total_length = 0;
 					int i = 0;
 					int match_found = 0;
-					total_length = getDirectory(contents);
+					getDirectory(contents);
 
 					while(contents[i] != NULL)
 					{
-						printf("Comparing file #%d: %s with %s\n", i, contents[i], file_name);
+
+						// Debug
+						//printf("Comparing file #%d: %s with %s\n", i, contents[i], file_name);
+						
 						if(strcmp(file_name, contents[i]) == 0)
 						{
-							printf("MATCH FOUND\n");
+
+							// Debug
+							//printf("MATCH FOUND\n");
 							match_found = 1;
 						}
 						
@@ -191,7 +180,6 @@ int main(int argc, char* argv[])
 						if(dataConnection_sockfd < 0) perror("ERROR on data connection accept!\n"); 
 
 						// Send the found requested file contents.
-						// TODO
 						sendFile(dataConnection_sockfd, file_name);
 
 						// Don't leave open sockets! 
@@ -243,6 +231,8 @@ void sendMessage(int sockfd, char* buffer)
 	{
 		n = write(sockfd, buffer, message_length - running_total);
 		running_total += n;
+
+		// Debug
 		//printf("bytes sent: %d\n", running_total);
 
 		if(n < 0)
@@ -322,7 +312,6 @@ void sendFile(int sockfd, char* file_name)
 
 	sendNumber(sockfd, strlen(file_contents));
 	sendMessage(sockfd, file_contents);
-
 }
 
 // Gets the contents of the requested file and stores them in a string.
