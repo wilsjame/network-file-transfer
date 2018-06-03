@@ -2,7 +2,7 @@
 
 #*********************************************************************
 #** Author: James G Wilson
-#** Date: 5/29/2018
+#** Date: 5/29/2018 
 #** Description: ftclient
 #**		 A simple file transfer client written in Python. To
 #		 be used with the C program, ftclient.c.
@@ -12,11 +12,6 @@ import socket
 import struct
 from time import sleep
 from os import path
-
-# minimum functions
-# initiateContact
-# makeRequest
-# receive file functions
 
 # Initiate contact with the server.
 # Returns a connected socket.
@@ -63,6 +58,8 @@ def receiveMessage(sockfd):
 
 	# Parse and print the delivered content.
 	payload = sockfd.recv(message_size[0]).decode()
+
+	#Debug
 	#print(payload)
 
 	return payload
@@ -71,14 +68,16 @@ def receiveMessage(sockfd):
 def receiveFile(sockfd, filename):
 	file_contents = receiveMessage(sockfd)
 
+	# Handle duplicate file scenario.
 	if path.isfile(filename):
 		filename = filename.split(".")[0] + "_copy.txt"
 	with open(filename, 'w') as f:
 		f.write(file_contents)
 
+# Driver program.
 def main():
 
-	# Check for correct command line syntax.
+	# Validate parameters.
 	if len(sys.argv) < 5 or len(sys.argv) > 6:
 		print("Usage ./ftclient <SERVER_HOST> <SERVER_PORT> <COMMAND> <FILENAME> <DATA_PORT>")
 		exit(1)
@@ -129,10 +128,10 @@ def main():
 
 		# Get the length of the file name requested.
 		filename_length = len(filename)
-		print("length of filename: " + filename + ": " + str(filename_length))
 
-		# Establish data connection with server.
-		#server_data_socket = initiateContact(server_host, data_port)
+		#Debug
+		#print("length of filename: " + filename + ": " + str(filename_length))
+
 		print("Requesting file: " + filename + " from " + server_host + ":" + data_port)
 
 		# Send length of the filename first.
@@ -156,7 +155,6 @@ def main():
 			server_data_socket = initiateContact(server_host, data_port)
 			print("Receiving file: " + filename + " from " + server_host + ":" + data_port)
 
-			#TODO
 			# Receive the requested file.
 			receiveFile(server_data_socket, filename)
 			print("File transfer complete!")

@@ -70,7 +70,9 @@ int main(int argc, char* argv[])
 				int data_server_sockfd;
 				int dataConnection_sockfd;
 
-				printf("Connection made with client! In child process!\n");
+
+				printf("Begin transaction with client! *In child process*\n");
+				printf("*************************************************\n");
 
 				// Accept and interpret command from client.
 				command = handleRequest(controlConnection_sockfd, &data_port);
@@ -123,6 +125,9 @@ int main(int argc, char* argv[])
 				}
 				else if(command == 2) // File requested.
 				{
+
+					printf("File requested on port %d\n", data_port);
+
 					int file_name_length;
 					char file_name[256]; memset(file_name, '\0', sizeof(file_name));
 					
@@ -152,8 +157,7 @@ int main(int argc, char* argv[])
 						if(strcmp(file_name, contents[i]) == 0)
 						{
 
-							// Debug
-							//printf("MATCH FOUND\n");
+							printf("File found!\n");
 							match_found = 1;
 						}
 						
@@ -189,6 +193,7 @@ int main(int argc, char* argv[])
 					}
 					else
 					{
+						printf("File not found!\n");
 						sendNumber(controlConnection_sockfd, (int)strlen("File not found!"));
 						sendMessage(controlConnection_sockfd, "File not found!");
 					}
@@ -309,6 +314,8 @@ void sendFile(int sockfd, char* file_name)
 {
 	char* file_contents;
 	file_contents = getFile(file_name);
+	printf("length of file contents %zu", strlen(file_contents));
+
 
 	sendNumber(sockfd, strlen(file_contents));
 	sendMessage(sockfd, file_contents);
@@ -317,6 +324,7 @@ void sendFile(int sockfd, char* file_name)
 // Gets the contents of the requested file and stores them in a string.
 char* getFile(char* file_name)
 {
+
 	char* file_contents = NULL;
 
 	FILE* fp = fopen(file_name, "r");
@@ -325,7 +333,8 @@ char* getFile(char* file_name)
 	{
 		perror("ERROR opening file");
 	}
-	else // The file opened succesfully.
+
+	if(fp != NULL) // The file opened succesfully.
 	{
 
 		// Start reading the file.
@@ -471,7 +480,8 @@ int startup(char* server_port)
 
 		if(sockfd == -1);
 		{
-			fprintf(stderr, "Server: socket error\n");
+			//Debug
+			//fprintf(stderr, "Server: socket error\n");
 		}
 
 		if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
@@ -482,7 +492,9 @@ int startup(char* server_port)
 
 		if(bind(sockfd, rp->ai_addr, rp->ai_addrlen) == 0) // Bind socket to port #
 		{
-			printf("bind success!\n");
+
+			//Debug
+			//printf("bind success!\n");
 			break; // Success!
 		}
 		else
